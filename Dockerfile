@@ -1,18 +1,11 @@
 # bump: debian-buster-slim /FROM debian:(.*)/ docker:debian|/^buster-.*-slim/|sort
-FROM debian:buster-20210311-slim
-MAINTAINER Mattias Wadman mattias.wadman@gmail.com
+FROM alpine
 RUN \
-  apt-get update && \
-  apt-get -y --no-install-recommends install \
-    procps \
-    postfix \
-    libsasl2-modules \
-    opendkim \
-    opendkim-tools \
-    ca-certificates \
-    rsyslog && \
-  apt-get clean && \
-  rm -rf /var/lib/apt/lists/*
+  apk add --no-cache procps postfix libsasl opendkim opendkim-utils \
+      ca-certificates rsyslog bash
+
+COPY rootfs/ /
+
 # Default config:
 # Open relay, trust docker links for firewalling.
 # Try to use TLS when sending to other smtp servers.
@@ -30,9 +23,6 @@ ENV \
   OPENDKIM_InternalHosts="0.0.0.0/0, ::/0" \
   OPENDKIM_KeyTable=refile:/etc/opendkim/KeyTable \
   OPENDKIM_SigningTable=refile:/etc/opendkim/SigningTable
-COPY rsyslog.conf /etc/rsyslog.conf
-RUN mkdir -p /etc/opendkim/keys
-COPY run /root/
-VOLUME ["/var/lib/postfix", "/var/mail", "/var/spool/postfix", "/etc/opendkim/keys"]
-EXPOSE 25
-CMD ["/root/run"]
+#VOLUME ["/var/lib/postfix", "/var/mail", "/var/spool/postfix", "/etc/opendkim/keys"]
+EXPOSE 25 587
+CMD ["/docker-run"]
