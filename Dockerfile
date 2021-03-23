@@ -19,6 +19,12 @@ ENV \
   POSTFIX_mynetworks=0.0.0.0/0 \
   POSTFIX_smtp_tls_security_level=may \
   POSTFIX_smtpd_tls_security_level=none \
+  POSTFIX_append_dot_mydomain=no \
+  POSTFIX_bounce_queue_lifetime=1d \
+  POSTFIX_delay_warning_time=0h \
+  POSTFIX_disable_vrfy_command=yes \
+  POSTFIX_smtp_header_checks="regexp:/etc/postfix/header/trim.regexp" \
+  POSTFIX_enable_long_queue_ids=yes \
   OPENDKIM_Socket=inet:12301@localhost \
   OPENDKIM_Mode=sv \
   OPENDKIM_UMask=002 \
