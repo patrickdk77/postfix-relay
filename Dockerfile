@@ -1,8 +1,11 @@
 # bump: debian-buster-slim /FROM debian:(.*)/ docker:debian|/^buster-.*-slim/|sort
 FROM alpine
 RUN \
-  apk add --no-cache procps postfix libsasl opendkim opendkim-utils \
-      ca-certificates rsyslog bash
+    apk add --no-cache procps postfix libsasl opendkim opendkim-utils \
+      ca-certificates rsyslog bash \
+ && mkdir -p /var/spool/rsyslog \
+ && mkdir -p /etc/opendkim/keys \
+ && mkdir -p /run
 
 COPY rootfs/ /
 

@@ -42,7 +42,7 @@ dkimConfig()
 # sometimes falsely think it's already running if some other process
 # happens to have its old pid when starting.
 rm -f \
-  /run/opendkim/opendkim.pid \
+  /run/opendkim.pid \
   /run/rsyslogd.pid \
   /var/spool/postfix/pid/master.pid
 
@@ -51,6 +51,10 @@ sed -i -e '17s|^#||' -e '18s|^#||' -e '22s|^#||' -e '28s|^#||' /etc/postfix/mast
 # POSTFIX_var env -> postconf -e var=$POSTFIX_var
 for e in ${!POSTFIX_*} ; do postconf -e "${e:8}=${!e}" ; done
 chown -R postfix:postfix /var/lib/postfix /var/mail /var/spool/postfix
+chown root /var/spool/postfix
+chown root /var/spool/postfix/pid
+chown -R :postdrop /var/spool/postfix/public
+chown -R :postdrop /var/spool/postfix/maildrop
 
 # OPENDKIM_var env -> put "key value" line in /etc/opendkim.conf
 echo -n > /etc/opendkim.conf
@@ -61,12 +65,23 @@ for e in ${!OPENDKIM_*} ; do
   echo "${e:9} ${!e}" >> /etc/opendkim.conf
 done
 
-trap "service postfix stop; service opendkim stop; pkill -TERM rsyslogd" SIGTERM SIGINT
+trap "/usr/sbin/postfix stop; pkill -TERM opendkim; pkill -TERM rsyslogd" SIGTERM SIGINT
+
+rsyslogd
 if [ ! -z "$OPENDKIM_DOMAINS" ] ; then
   dkimConfig
-  service opendkim start
+  /usr/sbin/opendkim -u opendkim -P /run/opendkim.pid -x /etc/opendkim.conf
 fi
-service postfix start
-rsyslogd -n &
-wait
+/usr/sbin/postfix start
+#wait $(cat /var/spool/postfix/pid/master.pid) $(cat /run/opendkim.pid)
+sleep 10
+while [ -e /var/spool/postfix/pid/master.pid ] && [ -e /run/opendkim.pid ]; do
+  if [ ! -d /proc/$(tr -d " \t" < /var/spool/postfix/pid/master.pid) ]; then
+    exit 1
+  fi
+  if [ ! -d /proc/$(tr -d " \t" < /run/opendkim.pid) ]; then
+    exit 1
+  fi
+  sleep 10
+done
 exit 0
