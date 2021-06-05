@@ -55,6 +55,7 @@ chown root /var/spool/postfix
 chown root /var/spool/postfix/pid
 chown -R :postdrop /var/spool/postfix/public
 chown -R :postdrop /var/spool/postfix/maildrop
+newaliases
 
 # OPENDKIM_var env -> put "key value" line in /etc/opendkim.conf
 echo -n > /etc/opendkim.conf
