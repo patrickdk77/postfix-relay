@@ -47,9 +47,9 @@ rm -f \
 
 
 if [ ! -z "$SUBMISSION" ]; then
-  sed -ir -e 's|^#submission|submission|' -e 's|^#  -o(.*)submission|  -o\1submission|' -e 's|^#  -o smtpd_reject_unlisted_|  -o smtpd_reject_unlisted_|' -e 's|^#  -o(.*)wrappermode|  -o\1wrappermode|' -e 's|^#  -o(.*)ORIGINATING|  -o\1ORIGINATING|' -e 's/^#  -o smtpd_(client|helo|sender|relay|recipient)_restrictions=.*/  -o smtpd_\1_restrictions=\$mua_\1_restrictions/' /etc/postfix/master.cf
+  sed -i -re 's|^#submission|submission|' -re 's/^#  -o(.*)(smtpd_reject_unlisted|submission|wrappermode|ORIGINATING)/  -o\1\2/' -re 's/^#  -o smtpd_(client|helo|sender|relay|recipient)_restrictions=.*/  -o smtpd_\1_restrictions=\$mua_\1_restrictions/' /etc/postfix/master.cf
   if [ "$SUBMISSION" == "auth" ]; then
-    sed -ir -e 's|^#  -o smtpd_tls_|  -o smtpd_tls_|' -e 's|^#  -o smtpd_sasl_|  -o smtpd_sasl_|' /etc/postfix/master.cf
+    sed -i -re 's/^#  -o smtpd_(sasl|tls)_/  -o smtpd_\1_/' /etc/postfix/master.cf
   fi
 fi
 
@@ -69,6 +69,9 @@ newaliases
 if [ -d /etc/postfix/maps ]; then
   pushd /etc/postfix/maps
   for map in *; do
+    if [ "$map" = "*" ]; then
+      continue
+    fi
     if [[ "$map" == *.db ]]; then
       continue
     fi
