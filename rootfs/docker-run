@@ -3,7 +3,6 @@
 # DKIM config
 dkimConfig()
 {
-    postconf -e milter_protocol=2
     postconf -e milter_default_action=accept
     postconf -e smtpd_milters=inet:localhost:12301
 
@@ -33,7 +32,7 @@ dkimConfig()
 
       echo "$selector._domainkey.$domain $domain:$selector:$privateFile" >> /etc/opendkim/KeyTable
       echo "*@$domain $selector._domainkey.$domain" >> /etc/opendkim/SigningTable
-      
+
       cat "$txtFile"
     done
 }
@@ -46,16 +45,36 @@ rm -f \
   /run/rsyslogd.pid \
   /var/spool/postfix/pid/master.pid
 
-sed -i -e '17s|^#||' -e '18s|^#||' -e '22s|^#||' -e '28s|^#||' /etc/postfix/master.cf
+
+if [ ! -z "$SUBMISSION" ]; then
+  sed -ir -e 's|^#submission|submission|' -e 's|^#  -o(.*)submission|  -o\1submission|' -e 's|^#  -o smtpd_reject_unlisted_|  -o smtpd_reject_unlisted_|' -e 's|^#  -o(.*)wrappermode|  -o\1wrappermode|' -e 's|^#  -o(.*)ORIGINATING|  -o\1ORIGINATING|' -e 's/^#  -o smtpd_(client|helo|sender|relay|recipient)_restrictions=.*/  -o smtpd_\1_restrictions=\$mua_\1_restrictions/' /etc/postfix/master.cf
+  if [ "$SUBMISSION" == "auth" ]; then
+    sed -ir -e 's|^#  -o smtpd_tls_|  -o smtpd_tls_|' -e 's|^#  -o smtpd_sasl_|  -o smtpd_sasl_|' /etc/postfix/master.cf
+fi
 
 # POSTFIX_var env -> postconf -e var=$POSTFIX_var
 for e in ${!POSTFIX_*} ; do postconf -e "${e:8}=${!e}" ; done
+# POSTFIXMASTER_var env -> postconf -Me var=$POSTFIXMASTER_var + replace __ with /
+for e in ${!POSTFIXMASTER_*} ; do v="${e:14}" && postconf -Me "${v/__/\/}=${!e}"; done
+# POSTMAP_var env value -> /etc/postfix/var
+for e in ${!POSTMAP_*} ; do echo "${!e}" > "/etc/postfix/${e:8}" && postmap "/etc/postfix/${e:8}"; done
+
 chown -R postfix:postfix /var/lib/postfix /var/mail /var/spool/postfix
 chown root /var/spool/postfix
 chown root /var/spool/postfix/pid
 chown -R :postdrop /var/spool/postfix/public
 chown -R :postdrop /var/spool/postfix/maildrop
 newaliases
+if [ -d /etc/postfix/maps ]; then
+  pushd /etc/postfix/maps
+  for map in *; do
+    if [[ "$map" == *.db ]]; then
+      continue
+    fi
+    postmap $map
+  done
+  popd
+fi
 
 # OPENDKIM_var env -> put "key value" line in /etc/opendkim.conf
 echo -n > /etc/opendkim.conf
@@ -68,10 +87,54 @@ done
 
 trap "/usr/sbin/postfix stop; pkill -TERM opendkim; pkill -TERM rsyslogd" SIGTERM SIGINT
 
-rsyslogd
+if [ -e /etc/rsyslog.conf ]; then
+  echo "Skipping /etc/rsyslog.conf generating - file already exists"
+else
+  cat <<EOF > /etc/rsyslog.conf
+$ModLoad imuxsock
+$WorkDirectory /var/spool/rsyslog
+include(file="/etc/rsyslog.d/*.conf")
+*.*;auth,authpriv.none /dev/stdout
+EOF
+
+  if [ "${RSYSLOG_TIMESTAMP}" == 'no' ] ; then
+    echo '$template noTimestampFormat,"%syslogtag%%msg%\n"' >> /etc/rsyslog.conf
+    echo '$ActionFileDefaultTemplate noTimestampFormat' >> /etc/rsyslog.conf
+  fi
+
+  if [ "${RSYSLOG_LOG_TO_FILE}" == 'yes' ] ; then
+    echo 'mail.* -/var/log/mail.log' >> /etc/rsyslog.conf
+  fi
+
+  if [ -z ${RSYSLOG_REMOTE_PORT} ] ; then
+    RSYSLOG_REMOTE_PORT=514
+  fi
+  if [ -z ${RSYSLOG_REMOTE_TEMPLATE} ] ; then
+    RSYSLOG_REMOTE_TEMPLATE=RSYSLOG_ForwardFormat
+  fi
+  if [ ! -z ${RSYSLOG_REMOTE_HOST} ] ; then
+    echo "*.* action(type=\"omfwd\" target=\"${RSYSLOG_REMOTE_HOST}\" port=\"${RSYSLOG_REMOTE_PORT}\" template=\"${RSYSLOG_REMOTE_TEMPLATE}\")" >> /etc/rsyslog.conf
+  fi
+fi
+if [ ! -e /dev/log ]; then
+  rsyslogd -n &
+fi
 if [ ! -z "$OPENDKIM_DOMAINS" ] ; then
   dkimConfig
   /usr/sbin/opendkim -u opendkim -P /run/opendkim.pid -x /etc/opendkim.conf
+fi
+if [ ! -z "$POSTSRSD_DOMAIN" ] ; then
+  postsrs="-f10001 -r10002 -s/etc/postfix/postsrsd.secret -d${POSTSRSD_DOMAIN} -unobody"
+  if [ ! -z "$POSTSRSD_EXCLUDE" ] ; then
+    postsrs="${postsrs} -X${POSTSRSD_EXCLUDE}"
+  fi
+  if [ ! -z "$POSTSRSD_SECRET" ] ; then
+    echo "$POSTSRSD_SECRET" > /etc/postfix/postsrsd.secret
+  fi
+  if [ ! -e "/etc/postfix/postsrsd.secret" ] ; then
+    openssl rand --base64 42 > /etc/postfix/postsrsd.secret
+  fi
+  postsrsd ${postsrs}
 fi
 /usr/sbin/postfix start
 #wait $(cat /var/spool/postfix/pid/master.pid) $(cat /run/opendkim.pid)

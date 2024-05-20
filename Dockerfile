@@ -1,11 +1,17 @@
 # bump: debian-buster-slim /FROM debian:(.*)/ docker:debian|/^buster-.*-slim/|sort
 FROM alpine
 RUN \
-    apk add --no-cache procps postfix libsasl opendkim opendkim-utils \
+    apk add --no-cache procps postfix postfix-mysql postfix-pcre libsasl opendkim opendkim-utils postsrsd \
       ca-certificates rsyslog bash \
  && mkdir -p /var/spool/rsyslog \
  && mkdir -p /etc/opendkim/keys \
- && mkdir -p /run
+ && mkdir -p /run \
+ && printf '\n\
+slow      unix  -       -       n       -       -       smtp\n\
+  -o syslog_name=postfix-slow\n\
+\n\
+' >> /etc/postfix/master.cf \
+ && rm /etc/rsyslog.conf
 
 COPY rootfs/ /
 

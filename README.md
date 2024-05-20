@@ -8,12 +8,48 @@ protection. So be careful to not expose it publicly.
 ## Usage
 `docker pull mwader/postfix-relay` or clone/build it yourself. Docker hub image is built for `amd64`, `arm/v7` and `arm64`.
 
+### Postfix variables
+
 Postfix [configuration options](http://www.postfix.org/postconf.5.html) can be set
 using `POSTFIX_<name>` environment variables. See [Dockerfile](Dockerfile) for default
 configuration. You probably want to set `POSTFIX_myhostname` (the FQDN used by 220/HELO).
 
 Note that `POSTFIX_myhostname` will change the postfix option
 [myhostname](http://www.postfix.org/postconf.5.html#myhostname).
+
+You can modify master.cf using postconf with `POSTFIXMASTER_` variables. All double `__` symbols will be replaced with `/`. For example
+
+### Postfix master.cf variables
+
+```
+- POSTFIXMASTER_submission__inet=submission inet n - y - - smtpd
+```
+will produce
+
+```
+postconf -Me submission/inet="submission inet n - y - - smtpd"
+```
+
+### Postfix lookup tables
+
+You can also create multiline [tables](http://www.postfix.org/DATABASE_README.html#types) using `POSTMAP_<filename>` like this example:
+```
+environment:
+  - POSTFIX_transport_maps=hash:/etc/postfix/transport
+  - |
+    POSTMAP_transport=gmail.com smtp
+    mydomain.com relay:[relay1.mydomain.com]:587
+    * relay:[relay2.mydomain.com]:587
+```
+which will generate file `/etc/postfix/transport`
+```
+gmail.com smtp
+mydomain.com relay:[relay1.mydomain.com]:587
+* relay:[relay2.mydomain.com]:587
+```
+and run `postmap /etc/postfix/transport`.
+
+### OpenDKIM variables
 
 OpenDKIM [configuration options](http://opendkim.org/opendkim.conf.5.html) can be set
 using `OPENDKIM_<name>` environment variables. See [Dockerfile](Dockerfile) for default
@@ -35,6 +71,45 @@ smtp:
   environment:
     - POSTFIX_myhostname=smtp.domain.tld
     - OPENDKIM_DOMAINS=smtp.domain.tld
+```
+
+### Logging
+By default container only logs to stdout. If you mount a socket at /dev/log it will use this, for example logging to the root systems syslog daemon.
+If you also wish to log `mail.*` messages to file on persistent volume, you can do something like:
+
+```
+environment:
+  ...
+  - RSYSLOG_LOG_TO_FILE=yes
+  - RSYSLOG_TIMESTAMP=yes
+volumes:
+  - /your_local_path:/var/log/
+```
+
+You can also forward log output to remote syslog server if you define `RSYSLOG_REMOTE_HOST` variable. It always uses UDP protocol and port `514` as default value,
+port number can be changed to different one with `RSYSLOG_REMOTE_PORT`. Default format of forwarded messages is defined by Rsyslog template `RSYSLOG_ForwardFormat`,
+you can change it to [another template](https://www.rsyslog.com/doc/v8-stable/configuration/templates.html) (section Reserved Template Names) if you wish with `RSYSLOG_REMOTE_TEMPLATE` variable.
+
+```
+environment:
+  ...
+  - RSYSLOG_REMOTE_HOST=my.remote-syslog-server.com
+  - RSYSLOG_REMOTE_PORT=514
+  - RSYSLOG_REMOTE_TEMPLATE=RSYSLOG_ForwardFormat
+```
+
+#### Advanced logging configuration
+
+If configuration via environment variables is not flexible enough it's possible to configure rsyslog directly: `.conf` files in the `/etc/rsyslog.d` directory will be [sorted alphabetically](https://www.rsyslog.com/doc/v8-stable/rainerscript/include.html#file) and included into the primary configuration.
+
+### Timezone
+Wrong timestamps in log can be fixed by setting proper timezone.
+This parameter is handled by Debian base image.
+
+```
+environment:
+  ...
+  - TZ=Europe/Prague
 ```
 
 ### Known issues
