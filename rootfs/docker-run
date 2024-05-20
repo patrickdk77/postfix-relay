@@ -50,6 +50,7 @@ if [ ! -z "$SUBMISSION" ]; then
   sed -ir -e 's|^#submission|submission|' -e 's|^#  -o(.*)submission|  -o\1submission|' -e 's|^#  -o smtpd_reject_unlisted_|  -o smtpd_reject_unlisted_|' -e 's|^#  -o(.*)wrappermode|  -o\1wrappermode|' -e 's|^#  -o(.*)ORIGINATING|  -o\1ORIGINATING|' -e 's/^#  -o smtpd_(client|helo|sender|relay|recipient)_restrictions=.*/  -o smtpd_\1_restrictions=\$mua_\1_restrictions/' /etc/postfix/master.cf
   if [ "$SUBMISSION" == "auth" ]; then
     sed -ir -e 's|^#  -o smtpd_tls_|  -o smtpd_tls_|' -e 's|^#  -o smtpd_sasl_|  -o smtpd_sasl_|' /etc/postfix/master.cf
+  fi
 fi
 
 # POSTFIX_var env -> postconf -e var=$POSTFIX_var
@@ -90,7 +91,7 @@ trap "/usr/sbin/postfix stop; pkill -TERM opendkim; pkill -TERM rsyslogd" SIGTER
 if [ -e /etc/rsyslog.conf ]; then
   echo "Skipping /etc/rsyslog.conf generating - file already exists"
 else
-  cat <<EOF > /etc/rsyslog.conf
+  cat <<'EOF' > /etc/rsyslog.conf
 $ModLoad imuxsock
 $WorkDirectory /var/spool/rsyslog
 include(file="/etc/rsyslog.d/*.conf")
