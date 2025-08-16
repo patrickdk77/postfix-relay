@@ -1,8 +1,12 @@
 # bump: debian-buster-slim /FROM debian:(.*)/ docker:debian|/^buster-.*-slim/|sort
 FROM alpine
 RUN \
-    apk add --no-cache procps postfix postfix-mysql postfix-pcre libsasl opendkim opendkim-utils postsrsd \
+ apk add --no-cache procps postfix postfix-mysql postfix-pcre libsasl opendkim opendkim-utils postsrsd \
       ca-certificates rsyslog bash \
+ && apk add --no-cache perl-email-simple perl-io-multiplex perl-dbd-mysql perl-net-dns perl-mime-lite \
+ 	perl-sys-syslog perl-mail-dkim perl-net-smtp-ssl perl-net-server perl-net-ip perl-email-mime \
+ 	perl-email-address perl-capture-tiny perl-moo perl-moox-types-mooselike perl-sub-exporter perl-try-tiny \
+ 	perl-mro-compat perl-module-pluggable perl-module-runtime perl-devel-stacktrace perl-time-hires \
  && mkdir -p /var/spool/rsyslog \
  && mkdir -p /etc/opendkim/keys \
  && mkdir -p /run \
