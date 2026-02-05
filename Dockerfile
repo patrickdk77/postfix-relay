@@ -15,7 +15,7 @@ RUN \
  && mkdir -p /var/spool/rsyslog \
  && mkdir -p /etc/opendkim/keys \
  && mkdir -p /run \
- && printf '[client]\ndefault-character-set = latin1\nssl-mode = DISABLED\n\n[client-mariadb]\nssl-verify-server-cert = false\ndisable-ssl\n\n' >> /etc/my.cnf \
+ && printf '[client]\ndefault-character-set = latin1\n\n[client-mariadb]\nssl-verify-server-cert = false\n\n' >> /etc/my.cnf \
  && printf '\n\
 slow      unix  -       -       n       -       -       smtp\n\
   -o syslog_name=postfix/slow/smtp\n\
