@@ -1,7 +1,12 @@
 # bump: debian-buster-slim /FROM debian:(.*)/ docker:debian|/^buster-.*-slim/|sort
 FROM alpine
 RUN \
- apk add --no-cache procps postfix postfix-mysql postfix-pcre libsasl opendkim opendkim-utils postsrsd \
+ --mount=type=bind,source="extras",target=/extras \
+ set -e \
+ && . /etc/os-release \
+ && arch=$(uname -m) \
+ && cp -a /extras/postfix_exporter_$arch /usr/local/bin/postfix_exporter \
+ && apk add --no-cache procps postfix postfix-mysql postfix-pcre libsasl opendkim opendkim-utils postsrsd \
       ca-certificates rsyslog bash \
  && apk add --no-cache perl-email-simple perl-io-multiplex perl-dbd-mysql perl-net-dns perl-mime-lite \
  	perl-sys-syslog perl-mail-dkim perl-net-smtp-ssl perl-net-server perl-net-ip perl-email-mime \
@@ -10,6 +15,7 @@ RUN \
  && mkdir -p /var/spool/rsyslog \
  && mkdir -p /etc/opendkim/keys \
  && mkdir -p /run \
+ && printf '[client]\ndefault-character-set = latin1\nssl-mode = DISABLED\n\n[client-mariadb]\nssl-verify-server-cert = false\ndisable-ssl\n\n' >> /etc/my.cnf \
  && printf '\n\
 slow      unix  -       -       n       -       -       smtp\n\
   -o syslog_name=postfix/slow/smtp\n\
@@ -24,6 +30,7 @@ COPY rootfs/ /
 # Try to use TLS when sending to other smtp servers.
 # No TLS for connecting clients, trust docker network to be safe
 ENV \
+  MARIADB_TLS_DISABLE_PEER_VERIFICATION=1 \
   POSTFIX_myhostname=hostname \
   POSTFIX_mydestination=localhost \
   POSTFIX_mynetworks=0.0.0.0/0 \
@@ -50,3 +57,22 @@ ENV \
 #VOLUME ["/var/lib/postfix", "/var/mail", "/var/spool/postfix", "/etc/opendkim/keys"]
 EXPOSE 25 587
 CMD ["/docker-run"]
+
+ARG BUILD_DATE BUILD_REF BUILD_VERSION
+LABEL \
+  Description="Lightweight container for Postfix based on Alpine Linux." \
+  org.label-schema.schema-version="1.0" \
+  org.label-schema.build-date="${BUILD_DATE}" \
+  org.label-schema.name="postfix-relay" \
+  org.label-schema.description="Postfix alpine base image" \
+  org.label-schema.url="https://github.com/patrickdk77/postfix-relay/" \
+  org.label-schema.usage="https://github.com/patrickdk77/postfix-relay/tree/master/README.md" \
+  org.label-schema.vcs-url="https://github.com/patrickdk77/postfix-relay" \
+  org.label-schema.vcs-ref="${BUILD_REF}" \
+  org.label-schema.version="${BUILD_VERSION}" \
+  org.opencontainers.image.authors="Patrick Domack (patrickdk@patrickdk.com)" \
+  org.opencontainers.image.created="${BUILD_DATE}" \
+  org.opencontainers.image.title="postfix-relay" \
+  org.opencontainers.image.description="Postfix alpine image" \
+  org.opencontainers.image.version="${BUILD_VERSION}" \
+  version="${BUILD_VERSION}"
