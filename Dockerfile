@@ -6,8 +6,9 @@ RUN \
  && . /etc/os-release \
  && arch=$(uname -m) \
  && cp -a /extras/postfix_exporter_$arch /usr/local/bin/postfix_exporter \
+ && cp -a /extras/autoreply_$arch /usr/local/bin/autoreply \
  && apk add --no-cache procps postfix postfix-mysql postfix-pcre libsasl opendkim opendkim-utils postsrsd \
-      ca-certificates rsyslog bash mtree-portable \
+      ca-certificates rsyslog bash mtree-portable mariadb-client \
 # && apk add --no-cache perl-email-simple perl-io-multiplex perl-dbd-mysql perl-net-dns perl-mime-lite \
 # 	perl-sys-syslog perl-mail-dkim perl-net-smtp-ssl perl-net-server perl-net-ip perl-email-mime \
 # 	perl-email-address perl-capture-tiny perl-moo perl-moox-types-mooselike perl-sub-exporter perl-try-tiny \
