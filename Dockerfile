@@ -7,7 +7,7 @@ RUN \
  && arch=$(uname -m) \
  && cp -a /extras/postfix_exporter_$arch /usr/local/bin/postfix_exporter \
  && apk add --no-cache procps postfix postfix-mysql postfix-pcre libsasl opendkim opendkim-utils postsrsd \
-      ca-certificates rsyslog bash \
+      ca-certificates rsyslog bash mtree-portable \
 # && apk add --no-cache perl-email-simple perl-io-multiplex perl-dbd-mysql perl-net-dns perl-mime-lite \
 # 	perl-sys-syslog perl-mail-dkim perl-net-smtp-ssl perl-net-server perl-net-ip perl-email-mime \
 # 	perl-email-address perl-capture-tiny perl-moo perl-moox-types-mooselike perl-sub-exporter perl-try-tiny \
@@ -33,7 +33,6 @@ ENV \
   MARIADB_TLS_DISABLE_PEER_VERIFICATION=1 \
   POSTFIX_myhostname=hostname \
   POSTFIX_mydestination=localhost \
-  POSTFIX_mynetworks=0.0.0.0/0 \
   POSTFIX_smtp_tls_security_level=may \
   POSTFIX_smtpd_tls_security_level=none \
   POSTFIX_append_dot_mydomain=no \

@@ -46,31 +46,85 @@ rm -f \
   /var/spool/postfix/pid/master.pid
 
 TLS_CERT="${TLS_CERT:-/etc/tls}"
-if [ -e "$TLS_CERT" ]; then
-  find -L ${TLS_CERT} -type f -print0 | xargs -0 sha1sum > /tmp/tls.hash
+TLS_HASH="${TLS_HASH:-/tmp/tls.hash}"
+
+tls_snapshot() {
+  local tmp="${TLS_HASH}.$$"
+  # Alpine's mtree-portable segfaults on -c unless -k sets the keywords.
+  if mtree -c -L -k type,size,time -p "$TLS_CERT" > "$tmp" 2>/dev/null; then
+    chmod go-rwx "$tmp"
+    mv -f "$tmp" "$TLS_HASH"
+    return 0
+  fi
+  rm -f "$tmp"
+  return 1
+}
+
+tls_check() {
+  [ -d "$TLS_CERT" ] || return 0
+  # An empty snapshot matches any directory, so treat it as missing.
+  if [ ! -s "$TLS_HASH" ]; then
+    tls_snapshot || echo "docker-run: cannot snapshot $TLS_CERT" >&2
+    return 0
+  fi
+  mtree -f "$TLS_HASH" -L -p "$TLS_CERT" >/dev/null 2>&1
+  case $? in
+    0)
+      ;;
+    2)
+      echo "docker-run: $TLS_CERT changed, reloading postfix"
+      if /usr/sbin/postfix reload; then
+        tls_snapshot || echo "docker-run: postfix reloaded but the snapshot failed" >&2
+      else
+        echo "docker-run: postfix reload failed, retrying next check" >&2
+      fi
+      ;;
+    *)
+      echo "docker-run: $TLS_HASH unreadable, rebuilding" >&2
+      tls_snapshot || echo "docker-run: cannot snapshot $TLS_CERT" >&2
+      ;;
+  esac
+}
+
+if [ -d "$TLS_CERT" ]; then
+  tls_snapshot || echo "docker-run: cannot snapshot $TLS_CERT, retrying next check" >&2
 fi
 
-if [ ! -z "$SUBMISSION" ]; then
+if [ ! -z "$SUBMISSION" ] && [ -w /etc/postfix/master.cf ]; then
   sed -i -re 's|^#submission|submission|' -re 's/^#  -o(.*)(smtpd_reject_unlisted|submission|wrappermode|ORIGINATING)/  -o\1\2/' -re 's/^#  -o smtpd_(client|helo|sender|relay|recipient)_restrictions=.*/  -o smtpd_\1_restrictions=\$mua_\1_restrictions/' /etc/postfix/master.cf
   if [ "$SUBMISSION" == "auth" ]; then
     sed -i -re 's/^#  -o smtpd_(sasl|tls)_/  -o smtpd_\1_/' /etc/postfix/master.cf
   fi
+elif [ ! -z "$SUBMISSION" ]; then
+  echo "docker-run: /etc/postfix/master.cf is read-only, skipping SUBMISSION"
 fi
 
-# POSTFIX_var env -> postconf -e var=$POSTFIX_var
-for e in ${!POSTFIX_*} ; do postconf -e "${e:8}=${!e}" ; done
-# POSTFIXMASTER_var env -> postconf -Me var=$POSTFIXMASTER_var + replace __ with /
-for e in ${!POSTFIXMASTER_*} ; do v="${e:14}" && postconf -Me "${v/__/\/}=${!e}"; done
-# POSTMAP_var env value -> /etc/postfix/var
-for e in ${!POSTMAP_*} ; do echo "${!e}" > "/etc/postfix/${e:8}" && postmap "/etc/postfix/${e:8}"; done
+if [ -w /etc/postfix/main.cf ]; then
+  # POSTFIX_var env -> postconf -e var=$POSTFIX_var
+  for e in ${!POSTFIX_*} ; do postconf -e "${e:8}=${!e}" ; done
+  # POSTFIXMASTER_var env -> postconf -Me var=$POSTFIXMASTER_var + replace __ with /
+  for e in ${!POSTFIXMASTER_*} ; do v="${e:14}" && postconf -Me "${v/__/\/}=${!e}"; done
+  # POSTMAP_var env value -> /etc/postfix/var
+  for e in ${!POSTMAP_*} ; do echo "${!e}" > "/etc/postfix/${e:8}" && postmap "/etc/postfix/${e:8}"; done
+else
+  echo "docker-run: /etc/postfix/main.cf is read-only, skipping POSTFIX_*, POSTFIXMASTER_* and POSTMAP_* settings"
+fi
 
 chown -R postfix:postfix /var/lib/postfix /var/mail /var/spool/postfix
 chown root /var/spool/postfix
 chown root /var/spool/postfix/pid
 chown -R :postdrop /var/spool/postfix/public
 chown -R :postdrop /var/spool/postfix/maildrop
-newaliases
-if [ -d /etc/postfix/maps ]; then
+alias_ro=
+for db in $(postconf -xh alias_database | tr ',' ' '); do
+  [ -w "$(dirname "${db##*:}")" ] || alias_ro="$(dirname "${db##*:}")"
+done
+if [ -z "$alias_ro" ]; then
+  newaliases
+else
+  echo "docker-run: $alias_ro is read-only, skipping newaliases"
+fi
+if [ -d /etc/postfix/maps ] && [ -w /etc/postfix/maps ]; then
   pushd /etc/postfix/maps
   for map in *; do
     if [ "$map" = "*" ]; then
@@ -82,6 +136,8 @@ if [ -d /etc/postfix/maps ]; then
     postmap $map
   done
   popd
+elif [ -d /etc/postfix/maps ]; then
+  echo "docker-run: /etc/postfix/maps is read-only, skipping postmap"
 fi
 
 # OPENDKIM_var env -> put "key value" line in /etc/opendkim.conf
@@ -164,16 +220,6 @@ while [ -e /var/spool/postfix/pid/master.pid ] && [ -e /run/opendkim.pid ]; do
     fi
     sleep 10
   done
-  if [ -e "/tmp/tls.hash" ]; then
-    sha1sum -c /tmp/tls.hash
-    if [ $? -ne 0 ]; then
-      find -L ${TLS_CERT} -type f -print0 | xargs -0 sha1sum > /tmp/tls.hash
-      /usr/sbin/postfix reload
-    fi
-  else
-    if [ -e "/tmp/tls" ]; then
-      find -L ${TLS_CERT} -type f -print0 | xargs -0 sha1sum > /tmp/tls.hash
-    fi
-  fi
+  tls_check
 done
 exit 0

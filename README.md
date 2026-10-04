@@ -2,8 +2,9 @@
 Postfix SMTP relay docker image. Useful for sending email without using an
 external SMTP server.
 
-Default configuration is an open relay that relies on docker networking for
-protection. So be careful to not expose it publicly.
+By default only the container itself can relay. Postfix trusts just its own
+addresses, 127.0.0.1 and the container's IP. Set `POSTFIX_mynetworks` to the
+networks that should relay through it, such as your docker network's subnet.
 
 ## Usage
 `docker pull mwader/postfix-relay` or clone/build it yourself. Docker hub image is built for `amd64`, `arm/v7` and `arm64`.
@@ -16,6 +17,12 @@ configuration. You probably want to set `POSTFIX_myhostname` (the FQDN used by 2
 
 Note that `POSTFIX_myhostname` will change the postfix option
 [myhostname](http://www.postfix.org/postconf.5.html#myhostname).
+
+If `/etc/postfix/main.cf` is mounted read-only, the container ignores the
+`POSTFIX_`, `POSTFIXMASTER_` and `POSTMAP_` variables and runs with the mounted
+configuration. It also skips `SUBMISSION` when master.cf is read-only, and skips
+`newaliases` and the startup `postmap` of /etc/postfix/maps when the directory
+they write to is read-only.
 
 You can modify master.cf using postconf with `POSTFIXMASTER_` variables. All double `__` symbols will be replaced with `/`. For example
 
