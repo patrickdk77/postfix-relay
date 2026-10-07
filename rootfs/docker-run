@@ -231,7 +231,7 @@ fi
 sleep 10
 if [ -x /usr/local/bin/postfix_exporter ]; then
   if ! grep -qs /etc/rsyslog.d/*.conf; then
-    /usr/local/bin/postfix_exporter --web.listen-address=:9117 --postfix.logfile_path=/var/log/mail.log --postfix.logfile_must_exist=false --postfix.instance=auto $exporter_args &
+    /usr/local/bin/postfix_exporter --web.listen-address=:9117 --postfix.logfile_path=/var/log/mail.log --no-postfix.logfile_must_exist --postfix.instance=auto $exporter_args &
   fi
 fi
 fails=0
