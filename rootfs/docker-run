@@ -90,6 +90,30 @@ if [ -d "$TLS_CERT" ]; then
   tls_snapshot || echo "docker-run: cannot snapshot $TLS_CERT, retrying next check" >&2
 fi
 
+smtp_check() {
+  local svc port line ok
+  for svc in $(postconf -M 2>/dev/null | awk '$2 == "inet" && ($8 == "smtpd" || $8 == "postscreen") { print $1 }'); do
+    port=${svc##*:}
+    case $port in
+      smtp) port=25 ;;
+      submission) port=587 ;;
+      smtps|submissions) continue ;;
+    esac
+    { exec 3<>/dev/tcp/127.0.0.1/$port; } 2>/dev/null || { echo "smtp_check: $svc: connect failed"; return 1; }
+    ok=
+    while IFS= read -r -t 15 line <&3; do
+      case $line in
+        "220 "*) ok=1; break ;;
+        220-*) continue ;;
+        *) break ;;
+      esac
+    done
+    [ -n "$ok" ] && printf 'QUIT\r\n' >&3
+    exec 3>&- 3<&-
+    [ -n "$ok" ] || { echo "smtp_check: $svc: no 220 greeting"; return 1; }
+  done
+}
+
 if [ ! -z "$SUBMISSION" ] && [ -w /etc/postfix/master.cf ]; then
   sed -i -re 's|^#submission|submission|' -re 's/^#  -o(.*)(smtpd_reject_unlisted|submission|wrappermode|ORIGINATING)/  -o\1\2/' -re 's/^#  -o smtpd_(client|helo|sender|relay|recipient)_restrictions=.*/  -o smtpd_\1_restrictions=\$mua_\1_restrictions/' /etc/postfix/master.cf
   if [ "$SUBMISSION" == "auth" ]; then
@@ -206,10 +230,11 @@ fi
 #wait $(cat /var/spool/postfix/pid/master.pid) $(cat /run/opendkim.pid)
 sleep 10
 if [ -x /usr/local/bin/postfix_exporter ]; then
-  if [ -e /var/log/mail.log ]; then
-    /usr/local/bin/postfix_exporter --web.listen-address ":9117" --collector file --file.log /var/log/mail.log &
+  if ! grep -qs /etc/rsyslog.d/*.conf; then
+    /usr/local/bin/postfix_exporter --web.listen-address=:9117 --postfix.logfile_path=/var/log/mail.log --postfix.logfile_must_exist=false --postfix.instance=auto $exporter_args &
   fi
 fi
+fails=0
 while [ -e /var/spool/postfix/pid/master.pid ] && [ -e /run/opendkim.pid ]; do
   for i in $(seq 1 1000); do
     if [ ! -d /proc/$(tr -d " \t" < /var/spool/postfix/pid/master.pid) ]; then
@@ -218,6 +243,9 @@ while [ -e /var/spool/postfix/pid/master.pid ] && [ -e /run/opendkim.pid ]; do
     if [ ! -d /proc/$(tr -d " \t" < /run/opendkim.pid) ]; then
       exit 1
     fi
+    #if [ $((i % 6)) -eq 1 ]; then
+    #  if smtp_check; then fails=0; else fails=$((fails + 1)); [ $fails -ge 3 ] && exit 1; fi
+    #fi
     sleep 10
   done
   tls_check
