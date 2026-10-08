@@ -9,6 +9,18 @@ networks that should relay through it, such as your docker network's subnet.
 ## Usage
 `docker pull mwader/postfix-relay` or clone/build it yourself. Docker hub image is built for `amd64`, `arm/v7` and `arm64`.
 
+### Bundled tools
+
+The image compiles three Go programs from this repository and installs them
+in `/usr/local/bin`:
+
+- `autoreply`, the pipe transport for `.autoreply` recipients. It reads
+  `/etc/autoreply.conf`.
+- `postfix_exporter`, the Prometheus exporter. `docker-run` starts it on port
+  9117 unless a file in `/etc/rsyslog.d` already runs it.
+- `pftool`, with `pfdel`, `pfhold`, `pfunhold` and `find_hold` linked to it.
+  See [pftool/README.md](pftool/README.md).
+
 ### Postfix variables
 
 Postfix [configuration options](http://www.postfix.org/postconf.5.html) can be set

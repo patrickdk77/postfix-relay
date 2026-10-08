@@ -1,0 +1,18 @@
+repos:
+  - repo: https://github.com/golangci/golangci-lint
+    rev: v2.14.0
+    hooks:
+      - id: golangci-lint
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-merge-conflict
+      - id: check-yaml
+        args: ["--allow-multiple-documents"]
+        exclude: charts/postfix-exporter/templates/
+      - id: end-of-file-fixer
+      - id: mixed-line-ending
+        args: ["--fix=lf"]
+ci:
+  autofix_prs: false
+  skip: [golangci-lint, check-merge-conflict, check-yaml, end-of-file-fixer, mixed-line-ending]

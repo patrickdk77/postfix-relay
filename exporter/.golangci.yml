@@ -1,0 +1,41 @@
+version: "2"
+linters:
+  enable:
+    - dupl
+    - ginkgolinter
+    - gocheckcompilerdirectives
+    - gocognit
+    - goconst
+    - gocyclo
+    - godot
+    - govet
+    - revive
+    - unparam
+  settings:
+    revive:
+      rules:
+        - name: dot-imports
+          disabled: true
+    govet:
+      enable:
+        - fieldalignment
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  enable:
+    - gofmt
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

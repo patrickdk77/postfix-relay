@@ -1,0 +1,25 @@
+name: main
+on:
+  push:
+    branches:
+      - master
+    tags-ignore:
+      - '*'
+  pull_request:
+    branches:
+      - master
+permissions:
+  actions: read
+  contents: read
+  pull-requests: write
+  security-events: write
+jobs:
+  verify:
+    uses: hsn723/actions/.github/workflows/verify.yml@7e09dd3503c2a673762de2853f0889dc39330a67 # v1.0.44
+    secrets: inherit
+    with:
+      lint-pre: |
+        make libsystemd-dev
+      additional-dry-run-setup: |
+        make libsystemd-dev
+        make gcc-aarch64-linux-gnu

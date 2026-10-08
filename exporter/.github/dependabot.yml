@@ -1,0 +1,55 @@
+version: 2
+updates:
+  - package-ecosystem: "gomod"
+    directory: "/"
+    schedule:
+      interval: "daily"
+    cooldown:
+      default-days: 3
+    allow:
+      - dependency-type: "all"
+    groups:
+      docker:
+        patterns:
+          - "^github.com/containerd/*"
+          - "^github.com/distribution/*"
+          - "^github.com/docker/*"
+          - "^github.com/moby/*"
+          - "^github.com/opencontainers/*"
+      otel:
+        patterns:
+          - "^github.com/prometheus/*"
+          - "^go.opentelemetry.io/*"
+      golang:
+        patterns:
+          - "^golang.org/x/*"
+      other:
+        patterns:
+          - "*"
+        exclude-patterns:
+          - "^github.com/containerd/*"
+          - "^github.com/distribution/*"
+          - "^github.com/docker/*"
+          - "^github.com/moby/*"
+          - "^github.com/opencontainers/*"
+          - "^github.com/prometheus/*"
+          - "^go.opentelemetry.io/*"
+          - "^golang.org/x/*"
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "daily"
+    cooldown:
+      default-days: 3
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "daily"
+    cooldown:
+      default-days: 3
+  - package-ecosystem: "pre-commit"
+    directory: "/"
+    schedule:
+      interval: "daily"
+    cooldown:
+      default-days: 3

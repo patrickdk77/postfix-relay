@@ -230,23 +230,28 @@ fi
 #wait $(cat /var/spool/postfix/pid/master.pid) $(cat /run/opendkim.pid)
 sleep 10
 if [ -x /usr/local/bin/postfix_exporter ]; then
-  if ! grep -qs /etc/rsyslog.d/*.conf; then
+  if ! grep -qs postfix_exporter /etc/rsyslog.d/*.conf; then
     /usr/local/bin/postfix_exporter --web.listen-address=:9117 --postfix.logfile_path=/var/log/mail.log --no-postfix.logfile_must_exist --postfix.instance=auto $exporter_args &
+  fi
+fi
+if [ -x /usr/local/bin/find_hold ]; then
+  if [ -e /etc/find_hold.conf ]; then
+    /usr/local/bin/find_hold &
   fi
 fi
 fails=0
 while [ -e /var/spool/postfix/pid/master.pid ] && [ -e /run/opendkim.pid ]; do
   for i in $(seq 1 1000); do
-    if [ ! -d /proc/$(tr -d " \t" < /var/spool/postfix/pid/master.pid) ]; then
-      exit 1
-    fi
-    if [ ! -d /proc/$(tr -d " \t" < /run/opendkim.pid) ]; then
-      exit 1
-    fi
-    #if [ $((i % 6)) -eq 1 ]; then
-    #  if smtp_check; then fails=0; else fails=$((fails + 1)); [ $fails -ge 3 ] && exit 1; fi
-    #fi
-    sleep 10
+      if [ ! -d /proc/$(tr -d " \t" < /var/spool/postfix/pid/master.pid) ]; then
+        exit 1
+      fi
+      if [ ! -d /proc/$(tr -d " \t" < /run/opendkim.pid) ]; then
+        exit 1
+      fi
+      #if [ $((i % 6)) -eq 1 ]; then
+      #  if smtp_check; then fails=0; else fails=$((fails + 1)); [ $fails -ge 3 ] && exit 1; fi
+      #fi
+      sleep 10
   done
   tls_check
 done

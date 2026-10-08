@@ -1,0 +1,19 @@
+name: Release Helm chart
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'charts/postfix-exporter/Chart.yaml'
+permissions:
+  contents: write
+  packages: write
+  id-token: write
+  attestations: write
+jobs:
+  release:
+    uses: hsn723/actions/.github/workflows/helm-release.yml@7e09dd3503c2a673762de2853f0889dc39330a67 # v1.0.44
+    secrets: inherit
+    with:
+      upload_as_oci: true
+      chart_name: postfix-exporter

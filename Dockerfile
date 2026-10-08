@@ -1,12 +1,22 @@
 # bump: debian-buster-slim /FROM debian:(.*)/ docker:debian|/^buster-.*-slim/|sort
+FROM golang:alpine AS build_autoreply
+WORKDIR /src
+COPY autoreply/ /src/
+RUN CGO_ENABLED=0 GOAMD64=v2 go build -trimpath -buildmode=pie -ldflags '-s -w' -o /autoreply .
+
+FROM golang:alpine AS build_exporter
+WORKDIR /src
+COPY exporter/ /src/
+RUN CGO_ENABLED=0 GOAMD64=v2 go build -trimpath -buildmode=pie -ldflags '-s -w' -o /postfix_exporter .
+
+FROM golang:alpine AS build_pftool
+WORKDIR /src
+COPY pftool/ /src/
+RUN CGO_ENABLED=0 GOAMD64=v2 go build -trimpath -buildmode=pie -ldflags '-s -w' -o /pftool .
+
 FROM alpine
 RUN \
- --mount=type=bind,source="extras",target=/extras \
  set -e \
- && . /etc/os-release \
- && arch=$(uname -m) \
- && cp -a /extras/postfix_exporter_$arch /usr/local/bin/postfix_exporter \
- && cp -a /extras/autoreply_$arch /usr/local/bin/autoreply \
  && apk add --no-cache procps postfix postfix-mysql postfix-pcre libsasl opendkim opendkim-utils postsrsd \
       ca-certificates rsyslog bash mtree-portable mariadb-client rsyslog-prog rsyslog-relp \
 # && apk add --no-cache perl-email-simple perl-io-multiplex perl-dbd-mysql perl-net-dns perl-mime-lite \
@@ -23,6 +33,11 @@ slow      unix  -       -       n       -       -       smtp\n\
 \n\
 ' >> /etc/postfix/master.cf \
  && rm /etc/rsyslog.conf
+
+COPY --from=build_autoreply /autoreply /usr/local/bin/autoreply
+COPY --from=build_exporter /postfix_exporter /usr/local/bin/postfix_exporter
+COPY --from=build_pftool /pftool /usr/local/bin/pftool
+RUN for n in pfdel pfhold pfunhold find_hold; do ln -s /usr/local/bin/pftool /usr/local/bin/$n; done
 
 COPY rootfs/ /
 

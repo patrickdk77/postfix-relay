@@ -1,0 +1,22 @@
+name: Tag and release
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - VERSION
+permissions:
+  contents: write
+  id-token: write
+  packages: write
+  attestations: write
+jobs:
+  release:
+    uses: hsn723/actions/.github/workflows/release.yml@7e09dd3503c2a673762de2853f0889dc39330a67 # v1.0.44
+    secrets: inherit
+    with:
+      additional-setup: |
+        make libsystemd-dev
+        make gcc-aarch64-linux-gnu
+      upload-image-sbom: false
+      disable-sudo: false
